@@ -1,6 +1,6 @@
-import { cumulative_std_scaler as CumulativeStdScaler } from "@math/std_scaler"
-import { Vector1D } from "math-types"
-import { EngineSchema, Id, needDummies, ValidateSchema } from "./engine-schema"
+import { cumulative_std_scaler as CumulativeStdScaler, NamedVector1D } from "@math/std_scaler"
+import { InputData, Vector1D } from "math-types"
+import { DummyVariable, EngineSchema, Id, needDummies, ValidateSchema } from "./engine-schema"
 import { CallbackArray } from "./util"
 
 interface Wheights {
@@ -21,9 +21,21 @@ interface EngineSettings {
 }
 
 class ContentBasedEngine implements EngineSettings {
+    /**
+     * The schema of the data, only data points that 
+     */
     readonly schema: EngineSchema
+    /**
+     * @returns An object containing all the features (not including id) and its types
+     */
     readonly fields: Fields
+    /**
+     * @returns An object relating every feature to its corresponding wheight, all wheights are 1 by default
+     */
     private _wheights: Wheights
+    /**
+     * @returns The name of the identifier for the data points
+     */
     readonly id_field: string;
     validators: CallbackArray
     transformers: CallbackArray
@@ -34,17 +46,27 @@ class ContentBasedEngine implements EngineSettings {
     }
     constructor(settings: EngineSettings) {
         this.schema = settings.schema
-        const id_field_entry = Object.entries(this.schema).find(([_, value]) => value === Id)
-        if (id_field_entry === undefined) {
+        this.fields = {}
+        this._wheights = {};
+        this.id_field = '';
+        this.dummy_variables = {}
+
+        for (const [ field_name, value ] of Object.entries(this.schema)) {
+            if (value === Id) {
+                this.id_field = field_name;
+            } else {
+                if (value === DummyVariable) {
+                    this.dummy_variables[field_name] = []
+                }
+                this.fields[field_name] = value
+                this._wheights[field_name] = 1
+            }
+        }
+
+        if (!this.id_field) {
             throw console.log('Something will go wrong. You didn\'t provide an ID field for the schema.', this.schema)
         }
-        const [ id_field ] = id_field_entry
-        this._wheights = {};
-        this.id_field = id_field;
-        this.fields = {
-            ...this._wheights,
-            [id_field]: Id
-        };
+
         this.validators = new CallbackArray()
         this.transformers = new CallbackArray()
         this.pipeline = [
@@ -53,7 +75,6 @@ class ContentBasedEngine implements EngineSettings {
             ...this.validators,
         ]
         this.std_scaler = new CumulativeStdScaler([])
-        this.dummy_variables = {}
     }
     get wheights() {
         return this._wheights
@@ -66,13 +87,16 @@ class ContentBasedEngine implements EngineSettings {
     viewPipeline() {
         return this.pipeline
     }
+    /**
+     * @deprecated Do not use this, it may look good but the validators are in the end of the callback chain for a reason
+     */
     reversePipeline() {
         return this.pipeline.reverse()
     }
     /**
      * Adds a single unscaled vector to the std_scaler
      */
-    private addSingleVector(vec:Vector1D) {
+    private addSingleVector(vec:NamedVector1D) {
         return this.std_scaler.addRow(vec)
     }
     private addSingleObject(data:any) {
@@ -98,23 +122,20 @@ class ContentBasedEngine implements EngineSettings {
             // if it is a tf-idf compute the tf for every data point
         } else {
             // This schema doest use dummy variables nor tf-idf, just add the number vectors to the std_scaler
-            delete transform_data[this.id_field];
-            return this.addSingleVector(Object.values(transform_data))
+            return this.addSingleVector(new NamedVector1D(Object.values(transform_data)).id(transform_data[this.id_field]))
         }
     }
-    addData(data: any | any[]) {
+    addData(data: InputData | InputData[]) {
         if (Array.isArray(data)) {
             // Is it a 1D Vector?
             if (data.every(item => typeof item === 'number')) {
-                // It is a 1D Vector, standarize it and add it by adding it to the std scaler
-                this.addSingleVector(data)
+                // It is a 1D Vector, we cant add it directly to the std scaler without an ID!
+                throw console.error('A Vector without and ID was provided to the "addData" method')
             } else {
-                // Sadly it is not. However it may be a array of 1D Vectors, check for it
+                // It is not. However it may be a array of 1D Vectors, check for it
                 if (data.every(item => Array.isArray(item) && item.every(sub_item => typeof sub_item === 'number') )) {
                     // Well, it seems to be an array of 1D Vectors, add every single one of them to the std scaler
-                    for (const vector of data) {
-                        this.addSingleVector(vector)
-                    }
+                    throw console.error('An Array Vector without and ID was provided to the "addData" method')
                 } else {
                     // It is not a array of vectors. So it can only be an array of objects
                     for (const item of data) {
