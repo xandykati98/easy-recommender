@@ -36,7 +36,7 @@ export const std_scaler = (matrix2D: Vector2D): Vector2D => {
 
 export class NamedVector1D extends Array<number> implements Vector1D {
     _id: string
-    constructor(args:Vector1D) {
+    constructor(...args:Vector1D) {
         super(...args)
         this._id = ''
     }
@@ -47,19 +47,14 @@ export class NamedVector1D extends Array<number> implements Vector1D {
 }
 
 export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
-    column_names:string[]
-    constructor(args:Vector2D) {
-        super(...args.map<NamedVector1D>(value => new NamedVector1D(value)))
-        this.column_names = []
-    }
-    addColumnName(name:string) {
-        return this.column_names.push(name)
+    constructor(...args:NamedVector1D[]) {
+        super(...args)
     }
     get numberOfRows() {
         return this.length
     }
     get numberOfColumns() {
-        return this.column_names.length
+        return this[0].length
     }
 }
 
@@ -84,13 +79,13 @@ export class cumulative_std_scaler {
      */
     columns_std:number[]
     
-    constructor(matrix2D: Vector2D) {
-        this.unscaled_matrix = new NamedVector2D(matrix2D);
+    constructor(matrix2D: NamedVector1D[]) {
+        this.unscaled_matrix = new NamedVector2D(...matrix2D);
         this.columns_u = []
         this.columns_variance = []
         this.columns_std = []
         this.columns_sum = []
-        this.scaled_matrix = new NamedVector2D([]);
+        this.scaled_matrix = new NamedVector2D();
         this.rescaleMatrix()
     }
     /**
@@ -98,7 +93,7 @@ export class cumulative_std_scaler {
      */
     async addRow(row:NamedVector1D, options?:{ updateColumnProps: boolean }) {
         this.unscaled_matrix.push(row)
-        const scaled_row = new NamedVector1D([]).id(row._id);
+        const scaled_row = new NamedVector1D().id(row._id);
         if (row.length > this.unscaled_matrix.numberOfColumns) {
             // new columns were added, probably by dummy variables
             
@@ -143,7 +138,7 @@ export class cumulative_std_scaler {
     rescaleMatrix() {
         let row_index = 0
         for (const row of this.unscaled_matrix) {
-            const scaled_row = new NamedVector1D([]).id(row._id);
+            const scaled_row = new NamedVector1D().id(row._id);
             let column_index: number = 0;
             for (const item of row) {
 

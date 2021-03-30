@@ -122,7 +122,7 @@ class ContentBasedEngine implements EngineSettings {
             // if it is a tf-idf compute the tf for every data point
         } else {
             // This schema doest use dummy variables nor tf-idf, just add the number vectors to the std_scaler
-            return this.addSingleVector(new NamedVector1D(Object.values(transform_data)).id(transform_data[this.id_field]))
+            return this.addSingleVector(new NamedVector1D(...Object.values<number>(transform_data)).id(transform_data[this.id_field]))
         }
     }
     addData(data: InputData | InputData[]) {

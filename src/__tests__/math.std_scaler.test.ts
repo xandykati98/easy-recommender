@@ -1,38 +1,47 @@
 
-import { std_scaler, cumulative_std_scaler } from '../math/std_scaler';
+import { std_scaler, cumulative_std_scaler, NamedVector1D, NamedVector2D } from '../math/std_scaler';
 
 const unscaled_matrix = [
-    [3.0, 0.0],
-    [0.0, 2.0],
-    [1.0, 1.0],
-    [8.0, 1.0],
+    new NamedVector1D(3.0, 0.0),
+    new NamedVector1D(0.0, 2.0),
+    new NamedVector1D(1.0, 1.0),
+    new NamedVector1D(8.0, 1.0),
 ];
 const scaled_matrix = [
-    [0, -1.414213562373095],
-    [-0.9733285267845753, 1.414213562373095],
-    [-0.6488856845230502, 0],
-    [1.6222142113076254, 0],
+    new NamedVector1D(0, -1.414213562373095),
+    new NamedVector1D(-0.9733285267845753, 1.414213562373095),
+    new NamedVector1D(-0.6488856845230502, 0),
+    new NamedVector1D(1.6222142113076254, 0),
 ]
 test('[ml] Standard Scaler', () => {
-    expect(std_scaler(unscaled_matrix)).toStrictEqual(scaled_matrix);
+    expect(new NamedVector2D(...std_scaler(unscaled_matrix).map(E => new NamedVector1D(...E)))).toStrictEqual(new NamedVector2D(...scaled_matrix));
 });
 test('[ml] Cumulative Standard Scaler', async () => {
     const css = new cumulative_std_scaler(unscaled_matrix);
-    expect(css.scaled_matrix).toStrictEqual(scaled_matrix);
+
+    // Test initialization computations
+    expect(css.scaled_matrix).toStrictEqual(new NamedVector2D(...scaled_matrix));
 
     const pre_unscaled_matrix = [
-        [3.0, 0.0],
-        [0.0, 2.0],
-        [1.0, 1.0],
+        new NamedVector1D(3.0, 0.0),
+        new NamedVector1D(0.0, 2.0),
+        new NamedVector1D(1.0, 1.0),
     ];
+    
     const css2 = new cumulative_std_scaler(pre_unscaled_matrix);
-    await css2.addRow([8.0, 1.0])
+
+    await css2.addRow(new NamedVector1D(8.0, 1.0))
+
+    // Test with sync recalculating the whole matrix
+    css2.rescaleMatrix()
     expect(css2.columns_std).toStrictEqual(css.columns_std);
     expect(css2.columns_u).toStrictEqual(css.columns_u);
     expect(css2.columns_variance).toStrictEqual(css.columns_variance);
     expect(css2.columns_sum).toStrictEqual(css.columns_sum);
-    
-    css2.rescaleMatrix()
-
     expect(css2.scaled_matrix).toStrictEqual(css.scaled_matrix);
+
+    /**
+     * @todo test with more columns after initialization
+     * @todo better way of naming columns in NamedVector2D
+     */
 });
