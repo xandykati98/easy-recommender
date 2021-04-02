@@ -6,6 +6,14 @@ export interface EngineSchema {
     [field_name: string]: Number | Id | DummyVariable | TfIdf
 }
 
+export type DummyEntry = { 
+    /**
+     * Dummy column name
+     */
+    key: string, 
+    value: string 
+}
+
 export function ValidateSchema(data: any, schema: EngineSchema):boolean {
     for (const field in schema) {
         if (!(field in data)) return false
@@ -23,7 +31,7 @@ export function RemoveUnnecessaryFields(data: any, schema: EngineSchema):any {
 
 export function needDummies(schema: EngineSchema):boolean {
     for (const field in schema) {
-        if (schema[field] === DummyVariable || schema[field] === TfIdf) return false
+        if (schema[field] === DummyVariable || schema[field] === TfIdf) return true
     }
-    return true
+    return false
 }

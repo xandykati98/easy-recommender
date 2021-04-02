@@ -77,6 +77,4 @@ test('[ml] Cumulative Standard Scaler With Schema (Dummyless)', async () => {
     css.addRow(new NamedVector1D(1000, 10).id('1'), ['price', 'size'])
     css.addRow(new NamedVector1D(2000, 12).id('2'), ['price', 'size'])
     css.addRow(new NamedVector1D(1500, 21).id('3'), ['price', 'size'])
-    css.log()
-    console.log(css.unscaled_matrix)
 });

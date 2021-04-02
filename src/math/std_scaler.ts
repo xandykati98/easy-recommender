@@ -1,5 +1,5 @@
 import { Vector1D, Vector2D } from 'math-types';
-import { DummyVariable, EngineSchema, Id, TfIdf } from '../engine-schema';
+import { DummyEntry, DummyVariable, EngineSchema, Id, TfIdf } from '../engine-schema';
 import sum from './sum';
 
 /**
@@ -51,17 +51,38 @@ export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
     constructor(...args:NamedVector1D[]) {
         super(...args)
     }
-    setNextIndex(row: NamedVector1D, row_indexed_columns:string[], columns_names:string[]) {
+    setNextIndex(row: NamedVector1D, row_indexed_columns:(string)[], columns_names:string[], column_types:(TfIdf|Number|DummyVariable)[]) {
         const index = this.numberOfRows;
         const vec_from_row = columns_names.map(name => row[row_indexed_columns.indexOf(name)]);
         // @todo: maybe fill array, because the line above will create <empty> values
-        this[index] = new NamedVector1D(...vec_from_row).id(row._id)
+        const vec_filled:number[] = []
+
+        for (let i = 0; i < vec_from_row.length; i++) {
+            const input_value = vec_from_row[i];
+            // Empty value, created when a dummy variable value is missing
+            if (input_value === undefined) {
+                // If it is a dummy variable we shall add a zero to symbolize this value as "off"
+                if (column_types[i] === DummyVariable) {
+                    vec_filled.push(0)
+                } else if (column_types[i] === TfIdf) {
+                    // this is where the tfidf values will need to be filled for every term
+                }
+            } else {
+                // normal value in non-dummy column
+                vec_filled.push(input_value)
+            }
+        }
+
+        this[index] = new NamedVector1D(...vec_filled).id(row._id)
     }
     get numberOfRows() {
         return this.length
     }
     get numberOfColumns() {
-        return this[0]?.length || 0
+        return this[this.length - 1]?.length || 0
+    }
+    get last() {
+        return this[this.length - 1]    
     }
 }
 
@@ -101,7 +122,7 @@ export class cumulative_std_scaler {
         this.columns_indexed_types = []
         if (schema) {
             for (const column_name in schema) {
-                if (schema[column_name] !== Id) {
+                if (schema[column_name] !== Id && schema[column_name] !== DummyVariable && schema[column_name] !== TfIdf) {
                     this.columns_indexed_names.push(column_name)
                     this.columns_indexed_types.push(schema[column_name])
                 }
@@ -121,46 +142,76 @@ export class cumulative_std_scaler {
         console.log(this.columns_indexed_names)
         console.log(this.columns_indexed_types)
         console.table(this.unscaled_matrix.slice(0, 10))
+        console.table(this.scaled_matrix.slice(0, 10))
+        console.log({
+            columns_sum: this.columns_sum,
+            columns_u: this.columns_u,
+            columns_std: this.columns_std,
+            columns_variance: this.columns_variance,
+        })
     }
-    addRow(row:NamedVector1D, row_indexed_columns?: string[], options?:{ updateColumnProps: boolean }) {
-        const numberOfPreviousColumns = this.unscaled_matrix.numberOfColumns;
-        const numberOfPreviousRows = this.unscaled_matrix.numberOfRows;
+    /**
+     * 
+     * @param row The input vector of unscaled float values
+     * @param row_indexed_columns The name of the column of each value by index, can contain dummy column names like "mydummy_val1"
+     * @param options 
+     * @returns 
+     */
+    addRow(row:NamedVector1D, row_indexed_columns?: (string|DummyEntry)[], options?:{ updateColumnProps: boolean }) {
+        // If it provides the column names for each value
         if (row_indexed_columns) {
-            this.unscaled_matrix.setNextIndex(row, row_indexed_columns, this.columns_indexed_names)
-        } else {
-            this.unscaled_matrix.push(row)
-        }
-        const scaled_row = new NamedVector1D().id(row._id);
-        if (row.length > numberOfPreviousColumns && numberOfPreviousColumns > 0) {
-            // new columns were added, probably by dummy variables
+            // We separate values by the column type
+            /**
+             * Values that were sent and are of type dummy, we will loop through them and create new columns (if they are new)
+             * based on their values, and set to 1 every other value in the column that is not yet assinged (values from old rows and
+             * values from new rows that dont have the same dummy value active)
+             */
+            const dummy_entries = row_indexed_columns.filter(icolumn => typeof icolumn !== 'string') as DummyEntry[]
+            // Normal values, these are not dummy variables
+            const normal_entries = row_indexed_columns.filter(icolumn => typeof icolumn === 'string') as string[]
             
-            let new_column_index = numberOfPreviousColumns;
-            for (const new_column_data_from_row of row.slice(numberOfPreviousColumns, row.length)) {
+            // New possible dummy variables values that were added during this insert
+            const new_dummy_columns:string[] = []
+            for (const { key, value } of dummy_entries) {
+                const dummy_column_name = `${key}_${value}`
+                // If the value of this dummy is new, add to the column list and to the "new_dummy_columns" array
+                if (!this.columns_indexed_names.includes(dummy_column_name)) {
+                    this.columns_indexed_names.push(dummy_column_name)
+                    this.columns_indexed_types.push(DummyVariable)
+                    new_dummy_columns.push(dummy_column_name)
+                }
+                normal_entries.push(dummy_column_name)
+            }
 
-                const new_column = new Array(numberOfPreviousRows).fill(0);
-                new_column.push(new_column_data_from_row)
+            // Set the next value of the "unscaled_matrix" with the input row, and provide the "setNextIndex" function with the possible new dummy values
+            this.unscaled_matrix.setNextIndex(row, normal_entries, this.columns_indexed_names, this.columns_indexed_types);
+
+            // For each new dummy value we will update the props of each new column created
+            for (const new_dummy_column of new_dummy_columns) {
+                const new_dummy_column_index = this.columns_indexed_names.indexOf(new_dummy_column)
                 
                 // Adds a new value to every row in the place of the new column
                 let unscaled_row_index = 0;
-                for (const unscaled_row of this.unscaled_matrix) {
-                    unscaled_row[new_column_index] = new_column[unscaled_row_index]
+                for (const unscaled_row of this.unscaled_matrix.slice(0, this.unscaled_matrix.numberOfRows - 1)) {
+                    unscaled_row[new_dummy_column_index] = this.unscaled_matrix[unscaled_row_index][new_dummy_column_index] || 0
                     unscaled_row_index++
                 }
 
-                this.updateColumnProps(new_column_index, this.unscaled_matrix)
+                // updates the new column's props
+                this.updateColumnProps(new_dummy_column_index, this.unscaled_matrix)
 
                 // scales the new column
-                this.rescaleColumn(new_column_index)
+                this.rescaleColumn(new_dummy_column_index)
 
-                new_column_index++
             }
-        } else if (row.length < numberOfPreviousColumns) {
-            while (row.length < numberOfPreviousColumns) {
-                row.push(0)
-            }
+        } else {
+            this.unscaled_matrix.push(row)
         }
-        for (let index = 0; index < row.length; index++) {
-            const item = row[index];
+
+        // Scales the last row (that is, the same row as the input)
+        const scaled_row = new NamedVector1D().id(row._id);
+        for (let index = 0; index < this.unscaled_matrix.last.length; index++) {
+            const item = this.unscaled_matrix.last[index];
             scaled_row.push((item - this.columns_u[index]) / this.columns_std[index])
         }
         this.scaled_matrix.push(scaled_row)

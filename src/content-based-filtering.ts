@@ -1,6 +1,6 @@
 import { cumulative_std_scaler as CumulativeStdScaler, NamedVector1D } from "@math/std_scaler"
 import { InputData, Vector1D } from "math-types"
-import { DummyVariable, EngineSchema, Id, needDummies, RemoveUnnecessaryFields, ValidateSchema } from "./engine-schema"
+import { DummyEntry, DummyVariable, EngineSchema, Id, needDummies, RemoveUnnecessaryFields, ValidateSchema } from "./engine-schema"
 import { CallbackArray } from "./util"
 
 interface Wheights {
@@ -97,7 +97,7 @@ class ContentBasedEngine implements EngineSettings {
     /**
      * Adds a single unscaled vector to the std_scaler
      */
-    private addSingleVector(vec:NamedVector1D, vec_indexed_columns:string[]) {
+    private addSingleVector(vec:NamedVector1D, vec_indexed_columns:(string|DummyEntry)[]) {
         return this.std_scaler.addRow(vec, vec_indexed_columns)
     }
     private addSingleObject(data:any) {
@@ -110,20 +110,34 @@ class ContentBasedEngine implements EngineSettings {
                 if (result === false) throw console.error('One object was unable to pass in a validator', { validator: check, object: data })
             } else {
                 // Else, it is a transformer
-                transform_data = check(transform_data)
+                transform_data = result
             }
         }
         /**
          * transform data is almost ready, it was compliant to the schema
          * next we will have to create the dummy variables for the data
          */
+        const { [this.id_field]: data_id, ...pure_data } = transform_data;
         if (needDummies(this.schema)) {
             // This schema uses binary dummy variables or tf-idf, generate the variables for this data point
             // and, if necessary, add new dummy variables created by this data point to every other vector as 0 if it is a dummy variable
             // if it is a tf-idf compute the tf for every data point
+
+            const vec = new NamedVector1D().id(data_id)
+            const vec_indexed_columns:(string|DummyEntry)[] = []
+
+            for (const [ key, value ] of Object.entries<string|number>(pure_data)) {
+                if (this.schema[key] === DummyVariable && typeof value === 'string') {
+                    vec.push(1)
+                    vec_indexed_columns.push({ key, value })
+                } else if (typeof value === 'number') {
+                    vec.push(value)
+                    vec_indexed_columns.push(key)
+                }
+            }
+            return this.addSingleVector(vec, vec_indexed_columns)
         } else {
             // This schema doest use dummy variables nor tf-idf, just add the number vectors to the std_scaler
-            const { [this.id_field]: data_id, ...pure_data } = transform_data;
             const vec = new NamedVector1D().id(data_id)
             const vec_indexed_columns:string[] = []
 
