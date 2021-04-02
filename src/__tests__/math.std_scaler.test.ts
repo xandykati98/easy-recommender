@@ -30,7 +30,7 @@ test('[ml] Cumulative Standard Scaler', async () => {
     
     const css2 = new cumulative_std_scaler(pre_unscaled_matrix);
 
-    await css2.addRow(new NamedVector1D(8.0, 1.0))
+    css2.addRow(new NamedVector1D(8.0, 1.0))
 
     // Test with sync recalculating the whole matrix
     css2.rescaleMatrix()
@@ -41,7 +41,28 @@ test('[ml] Cumulative Standard Scaler', async () => {
     expect(css2.scaled_matrix).toStrictEqual(css.scaled_matrix);
 
     /**
-     * @todo test with more columns after initialization
      * @todo better way of naming columns in NamedVector2D
      */
+    css2.addRow(new NamedVector1D(3, 5, 1))
+    css2.addRow(new NamedVector1D(2, 4, 8, 5))
+    css2.addRow(new NamedVector1D(2, 4, 0, 0))
+    css2.addRow(new NamedVector1D(2, 4,))
+    css2.addRow(new NamedVector1D())
+    
+    css2.rescaleMatrix()
+
+    const pre_unscaled_matrix2 = [
+        new NamedVector1D(3.0, 0.0),
+        new NamedVector1D(0.0, 2.0),
+        new NamedVector1D(1.0, 1.0),
+        new NamedVector1D(8.0, 1.0),
+        new NamedVector1D(3, 5, 1),
+        new NamedVector1D(2, 4, 8, 5),
+        new NamedVector1D(2, 4, 0, 0),
+        new NamedVector1D(2, 4,),
+        new NamedVector1D()
+    ];
+    const css3 = new cumulative_std_scaler(pre_unscaled_matrix2)
+    console.log(css2)
+    console.log(css3)
 });

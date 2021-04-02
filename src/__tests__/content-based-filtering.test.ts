@@ -9,7 +9,5 @@ const cbf = new cbf_engine({
 })
 
 test('Content Based Filtering', () => {
-    console.log(cbf.fields)
-    console.log(cbf.wheights)
 	expect(25.5).toBe(25.5);
 });

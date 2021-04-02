@@ -54,7 +54,7 @@ export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
         return this.length
     }
     get numberOfColumns() {
-        return this[0].length
+        return this[0]?.length || 0
     }
 }
 
@@ -79,41 +79,53 @@ export class cumulative_std_scaler {
      */
     columns_std:number[]
     
-    constructor(matrix2D: NamedVector1D[]) {
-        this.unscaled_matrix = new NamedVector2D(...matrix2D);
+    constructor(matrix2D: NamedVector1D[] | NamedVector2D) {
+        // Deepcopy the initial input vector
+        this.unscaled_matrix = new NamedVector2D();
         this.columns_u = []
         this.columns_variance = []
         this.columns_std = []
         this.columns_sum = []
         this.scaled_matrix = new NamedVector2D();
+        for (const row of matrix2D) {
+            this.addRow(new NamedVector1D(...row).id(row._id))
+        }
         this.rescaleMatrix()
     }
     /**
      * @todo add NamedVector2D column_names
      */
-    async addRow(row:NamedVector1D, options?:{ updateColumnProps: boolean }) {
+    addRow(row:NamedVector1D, options?:{ updateColumnProps: boolean }) {
+        const numberOfPreviousColumns = this.unscaled_matrix.numberOfColumns;
+        const numberOfPreviousRows = this.unscaled_matrix.numberOfRows;
         this.unscaled_matrix.push(row)
         const scaled_row = new NamedVector1D().id(row._id);
-        if (row.length > this.unscaled_matrix.numberOfColumns) {
+        if (row.length > numberOfPreviousColumns) {
             // new columns were added, probably by dummy variables
             
-            let new_column_index = this.unscaled_matrix.numberOfColumns;
-            for (const new_column_data_from_row of row.slice(this.unscaled_matrix.numberOfColumns, row.length)) {
+            let new_column_index = numberOfPreviousColumns;
+            for (const new_column_data_from_row of row.slice(numberOfPreviousColumns, row.length)) {
 
-                const new_column = new Array(this.unscaled_matrix.numberOfRows).fill(0);
+                const new_column = new Array(numberOfPreviousRows).fill(0);
                 new_column.push(new_column_data_from_row)
+                
+                // Adds a new value to every row in the place of the new column
+                let unscaled_row_index = 0;
+                for (const unscaled_row of this.unscaled_matrix) {
+                    unscaled_row[new_column_index] = new_column[unscaled_row_index]
+                    unscaled_row_index++
+                }
 
                 this.updateColumnProps(new_column_index, this.unscaled_matrix)
-
-                // Adds a new value to every row in the place of the new column
-                for (const unscaled_row of this.unscaled_matrix) {
-                    unscaled_row[new_column_index] = new_column[new_column_index]
-                }
 
                 // scales the new column
                 this.rescaleColumn(new_column_index)
 
                 new_column_index++
+            }
+        } else if (row.length < numberOfPreviousColumns) {
+            while (row.length < numberOfPreviousColumns) {
+                row.push(0)
             }
         }
         for (let index = 0; index < row.length; index++) {

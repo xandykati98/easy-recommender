@@ -101,6 +101,16 @@ cbf.queryOnInterest({
 
 // experimental
 
+const [ startTimer, pauseTimer, setInterest ] = cbf.createUser('aaaa')
+
+setInterest('231')
+
+const unpauseTimer = pauseTimer()
+const pauseTimer = unpauseTimer()
+
+const endTimer = startTimer()
+endTimer()
+
 const TweakerInstance = cbf._weightTweaker({ // usado para achar o melhor peso para cada feature
   price: [ 0, 1 ] // valores possiveis
 })

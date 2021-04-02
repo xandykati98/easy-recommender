@@ -74,7 +74,7 @@ class ContentBasedEngine implements EngineSettings {
             (data:any) => ValidateSchema(data, this.schema),
             ...this.validators,
         ]
-        this.std_scaler = new CumulativeStdScaler([])
+        this.std_scaler = new CumulativeStdScaler([]) // todo: insert column names
     }
     get wheights() {
         return this._wheights
