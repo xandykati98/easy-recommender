@@ -1,4 +1,5 @@
 import { Vector1D, Vector2D } from 'math-types';
+import { DummyVariable, EngineSchema, Id, TfIdf } from '../engine-schema';
 import sum from './sum';
 
 /**
@@ -50,6 +51,12 @@ export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
     constructor(...args:NamedVector1D[]) {
         super(...args)
     }
+    setNextIndex(row: NamedVector1D, row_indexed_columns:string[], columns_names:string[]) {
+        const index = this.numberOfRows;
+        const vec_from_row = columns_names.map(name => row[row_indexed_columns.indexOf(name)]);
+        // @todo: maybe fill array, because the line above will create <empty> values
+        this[index] = new NamedVector1D(...vec_from_row).id(row._id)
+    }
     get numberOfRows() {
         return this.length
     }
@@ -78,10 +85,28 @@ export class cumulative_std_scaler {
      * Standard deviation of the items in each column
      */
     columns_std:number[]
-    
-    constructor(matrix2D: NamedVector1D[] | NamedVector2D) {
+    /**
+     * The name of each column reflected by the index that it is in
+     */
+    columns_indexed_names:string[]
+    /**
+     * The type of each column reflected by the index that it is in
+     */
+    columns_indexed_types:(TfIdf|Number|DummyVariable)[]
+
+    constructor(matrix2D: NamedVector1D[] | NamedVector2D, schema?: EngineSchema) {
         // Deepcopy the initial input vector
         this.unscaled_matrix = new NamedVector2D();
+        this.columns_indexed_names = []
+        this.columns_indexed_types = []
+        if (schema) {
+            for (const column_name in schema) {
+                if (schema[column_name] !== Id) {
+                    this.columns_indexed_names.push(column_name)
+                    this.columns_indexed_types.push(schema[column_name])
+                }
+            }
+        }
         this.columns_u = []
         this.columns_variance = []
         this.columns_std = []
@@ -92,15 +117,21 @@ export class cumulative_std_scaler {
         }
         this.rescaleMatrix()
     }
-    /**
-     * @todo add NamedVector2D column_names
-     */
-    addRow(row:NamedVector1D, options?:{ updateColumnProps: boolean }) {
+    log() {
+        console.log(this.columns_indexed_names)
+        console.log(this.columns_indexed_types)
+        console.table(this.unscaled_matrix.slice(0, 10))
+    }
+    addRow(row:NamedVector1D, row_indexed_columns?: string[], options?:{ updateColumnProps: boolean }) {
         const numberOfPreviousColumns = this.unscaled_matrix.numberOfColumns;
         const numberOfPreviousRows = this.unscaled_matrix.numberOfRows;
-        this.unscaled_matrix.push(row)
+        if (row_indexed_columns) {
+            this.unscaled_matrix.setNextIndex(row, row_indexed_columns, this.columns_indexed_names)
+        } else {
+            this.unscaled_matrix.push(row)
+        }
         const scaled_row = new NamedVector1D().id(row._id);
-        if (row.length > numberOfPreviousColumns) {
+        if (row.length > numberOfPreviousColumns && numberOfPreviousColumns > 0) {
             // new columns were added, probably by dummy variables
             
             let new_column_index = numberOfPreviousColumns;

@@ -1,6 +1,6 @@
 import { cumulative_std_scaler as CumulativeStdScaler, NamedVector1D } from "@math/std_scaler"
 import { InputData, Vector1D } from "math-types"
-import { DummyVariable, EngineSchema, Id, needDummies, ValidateSchema } from "./engine-schema"
+import { DummyVariable, EngineSchema, Id, needDummies, RemoveUnnecessaryFields, ValidateSchema } from "./engine-schema"
 import { CallbackArray } from "./util"
 
 interface Wheights {
@@ -72,9 +72,10 @@ class ContentBasedEngine implements EngineSettings {
         this.pipeline = [
             ...this.transformers,
             (data:any) => ValidateSchema(data, this.schema),
+            (data:any) => RemoveUnnecessaryFields(data, this.schema),
             ...this.validators,
         ]
-        this.std_scaler = new CumulativeStdScaler([]) // todo: insert column names
+        this.std_scaler = new CumulativeStdScaler([], this.schema)
     }
     get wheights() {
         return this._wheights
@@ -96,11 +97,11 @@ class ContentBasedEngine implements EngineSettings {
     /**
      * Adds a single unscaled vector to the std_scaler
      */
-    private addSingleVector(vec:NamedVector1D) {
-        return this.std_scaler.addRow(vec)
+    private addSingleVector(vec:NamedVector1D, vec_indexed_columns:string[]) {
+        return this.std_scaler.addRow(vec, vec_indexed_columns)
     }
     private addSingleObject(data:any) {
-        let transform_data = data;
+        let transform_data = { ...data };
         const pipeline = this.viewPipeline()
         for (const check of pipeline) {
             const result = check(transform_data)
@@ -117,12 +118,21 @@ class ContentBasedEngine implements EngineSettings {
          * next we will have to create the dummy variables for the data
          */
         if (needDummies(this.schema)) {
-            // This schema use binary dummy variables or tf-idf, generate the variables for this data point
+            // This schema uses binary dummy variables or tf-idf, generate the variables for this data point
             // and, if necessary, add new dummy variables created by this data point to every other vector as 0 if it is a dummy variable
             // if it is a tf-idf compute the tf for every data point
         } else {
             // This schema doest use dummy variables nor tf-idf, just add the number vectors to the std_scaler
-            return this.addSingleVector(new NamedVector1D(...Object.values<number>(transform_data)).id(transform_data[this.id_field]))
+            const { [this.id_field]: data_id, ...pure_data } = transform_data;
+            const vec = new NamedVector1D().id(data_id)
+            const vec_indexed_columns:string[] = []
+
+            for (const [ key, value ] of Object.entries<number>(pure_data)) {
+                vec.push(value)
+                vec_indexed_columns.push(key)
+            }
+            
+            return this.addSingleVector(vec, vec_indexed_columns)
         }
     }
     addData(data: InputData | InputData[]) {

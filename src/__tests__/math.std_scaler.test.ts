@@ -1,4 +1,5 @@
 
+import { Id } from '../engine-schema';
 import { std_scaler, cumulative_std_scaler, NamedVector1D, NamedVector2D } from '../math/std_scaler';
 
 const unscaled_matrix = [
@@ -63,6 +64,19 @@ test('[ml] Cumulative Standard Scaler', async () => {
         new NamedVector1D()
     ];
     const css3 = new cumulative_std_scaler(pre_unscaled_matrix2)
-    console.log(css2)
-    console.log(css3)
+
+    expect(css2.scaled_matrix).toStrictEqual(css3.scaled_matrix);
+});
+test('[ml] Cumulative Standard Scaler With Schema (Dummyless)', async () => {
+    const css = new cumulative_std_scaler([], {
+        db_id: Id,
+        price: Number,
+        size: Number
+    });
+
+    css.addRow(new NamedVector1D(1000, 10).id('1'), ['price', 'size'])
+    css.addRow(new NamedVector1D(2000, 12).id('2'), ['price', 'size'])
+    css.addRow(new NamedVector1D(1500, 21).id('3'), ['price', 'size'])
+    css.log()
+    console.log(css.unscaled_matrix)
 });
