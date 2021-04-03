@@ -54,7 +54,6 @@ export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
     setNextIndex(row: NamedVector1D, row_indexed_columns:(string)[], columns_names:string[], column_types:(TfIdf|Number|DummyVariable)[]) {
         const index = this.numberOfRows;
         const vec_from_row = columns_names.map(name => row[row_indexed_columns.indexOf(name)]);
-        // @todo: maybe fill array, because the line above will create <empty> values
         const vec_filled:number[] = []
 
         for (let i = 0; i < vec_from_row.length; i++) {
@@ -209,6 +208,7 @@ export class cumulative_std_scaler {
         }
 
         // Scales the last row (that is, the same row as the input)
+        // Remember: This scale does not have a 100% precision, to achieve this the "rescaleMatrix" needs to be called
         const scaled_row = new NamedVector1D().id(row._id);
         for (let index = 0; index < this.unscaled_matrix.last.length; index++) {
             const item = this.unscaled_matrix.last[index];
@@ -221,7 +221,13 @@ export class cumulative_std_scaler {
             columns_variance: this.columns_variance,
             columns_std: this.columns_std,
         }
-        return this.updateColumnsProps()
+        // Just so the initial data insert doesnt have NaN's and Infinities
+        if (this.unscaled_matrix.numberOfRows === 1) {
+            this.updateColumnsProps()
+            return this.rescaleMatrix()
+        } else {
+            return this.updateColumnsProps()
+        }
     }
     /**
      * Scales the matrix, if called during initialization the "updateColumnsProps" method will be called, otherwise you
