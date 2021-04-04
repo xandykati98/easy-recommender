@@ -1,8 +1,8 @@
 
 import { Id } from '../engine-schema';
-import { std_scaler, cumulative_std_scaler, NamedVector1D, NamedVector2D } from '../math/std_scaler';
+import { cumulative_std_scaler, NamedVector1D } from '../math/std_scaler';
 
-test(' Multiple copies of SharedArrayScaler.waitLastCalc', async () => {
+test('Multiple copies of SharedArrayScaler.waitLastCalc', async () => {
     const css = new cumulative_std_scaler([], {
         db_id: Id,
         price: Number,
@@ -15,7 +15,7 @@ test(' Multiple copies of SharedArrayScaler.waitLastCalc', async () => {
         css.addRow(new NamedVector1D(Math.round(Math.random() * 1000), Math.round(Math.random() * 1000)).id(String(i)), ['price', 'size'], { informRecalc: i === (batch_size - 1) })
     }
 
-    for await (const column of css.performant_columns) {
+    for await (const column of css.precision_columns) {
         expect(typeof column.busy === 'boolean').toBe(true)
         await Promise.all([column.waitLastCalc(), column.waitLastCalc()])
         expect(column.busy).toBe(false)

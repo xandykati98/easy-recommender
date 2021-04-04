@@ -66,7 +66,7 @@ test('[ml] Cumulative Standard Scaler', async () => {
     const css3 = new cumulative_std_scaler(pre_unscaled_matrix2)
 });
 
-test('[ml] Performant Cumulative Standard Scaler', async () => {
+test('[ml] Precision Cumulative Standard Scaler', async () => {
     const css = new cumulative_std_scaler([], {
         db_id: Id,
         price: Number,
@@ -77,7 +77,7 @@ test('[ml] Performant Cumulative Standard Scaler', async () => {
     css.addRow(new NamedVector1D(1, 1).id('3'), ['price', 'size'])
     css.addRow(new NamedVector1D(1, 1).id('3'), ['price', 'size'])
 
-    for await (const column of css.performant_columns) {
+    for await (const column of css.precision_columns) {
         expect(typeof column.busy === 'boolean').toBe(true)
         await column.waitLastCalc()
         expect(column.busy).toBe(false)
@@ -86,7 +86,7 @@ test('[ml] Performant Cumulative Standard Scaler', async () => {
     }
 });
 
-test('[ml] Performant Cumulative Standard Scaler (Bulky add)', async () => {
+test('[ml] Precision Cumulative Standard Scaler (Bulky add)', async () => {
     const css = new cumulative_std_scaler([], {
         db_id: Id,
         price: Number,
@@ -99,7 +99,7 @@ test('[ml] Performant Cumulative Standard Scaler (Bulky add)', async () => {
         css.addRow(new NamedVector1D(Math.random() * 1000, Math.random() * 1000).id(String(i)), ['price', 'size'], { informRecalc: i === (batch_size - 1) })
     }
 
-    for await (const column of css.performant_columns) {
+    for await (const column of css.precision_columns) {
         expect(typeof column.busy === 'boolean').toBe(true)
         await column.waitLastCalc()
         expect(column.busy).toBe(false)

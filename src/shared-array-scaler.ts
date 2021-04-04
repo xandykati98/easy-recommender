@@ -1,20 +1,39 @@
 import { Worker } from 'worker_threads';
 
 type SharedArrayScalerOptions = {
+    /**
+     * This number is multiplied by 1024 if the "byte_length" is not provided, and then set to be the SharedArrayBuffer byte size
+     * @default 20
+     */
     byte_multiplier?: 20 | number,
+    /**
+     * The byte length of the SharedArrayBuffer, this will replace the default value AND will ignore the "byte_multiplier" property
+     */
     byte_length?: number,
 }
 
+/**
+ * This class is used to share a arraybuffer between the main thread and the worker threads so that the worker threads do 
+ * all the scaling for us, this will be useful for big datasets
+ */
 export default class SharedArrayScaler {
     length: number
     worker!: Worker
     typedarray: Float32Array
     unscaled_typedarray: Float32Array
+
+    /**
+     * The SharedArrayBuffer buffer size
+     * @default 20480
+     */
     buffer_size: number
     private worker_filename: string
-    readonly wait_resolvers: {
+    wait_resolvers: {
         [resolver_id:string]: Function
     }
+    /**
+     * Whether or not the worker is busy computing the scaled array
+     */
     busy:boolean
     constructor(options?:SharedArrayScalerOptions) {
         this.busy = false

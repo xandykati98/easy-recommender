@@ -91,6 +91,13 @@ export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
 export class cumulative_std_scaler {
     unscaled_matrix: NamedVector2D
     scaled_matrix: NamedVector2D
+    full_precision_until_index: number
+    /**
+     * These are the columns but using the "SharedArrayScaler" for auto scaling in worker threads.
+     * This will be used for full precision of possibly large datasets.
+     */
+    precision_columns: SharedArrayScaler[]
+    
     // Column props
     /**
      * Mean for each column
@@ -116,8 +123,14 @@ export class cumulative_std_scaler {
      * The type of each column reflected by the index that it is in
      */
     columns_indexed_types:(TfIdf|Number|DummyVariable)[]
-    full_precision_until_index: number
-    performant_columns: SharedArrayScaler[]
+    /**
+     * The first rows added to the matrix can have a very volatile mean and the rest of the data can lose a litte of precision
+     * this is used just so that the first items have full precision, avoid using values over 100 for this propery because the main thread
+     * may be blocked depending on the number of columns.
+     * 
+     * If you want full precision and have a big dataset take a look at the "precision_matrix"
+     * @default 10
+     */
 
     constructor(matrix2D: NamedVector1D[] | NamedVector2D, schema?: EngineSchema) {
         // Deepcopy the initial input vector
@@ -125,7 +138,7 @@ export class cumulative_std_scaler {
         this.columns_indexed_names = []
         this.columns_indexed_types = []
         this.full_precision_until_index = 10;
-        this.performant_columns = []
+        this.precision_columns = []
         if (schema) {
             for (const column_name in schema) {
                 if (schema[column_name] !== Id && schema[column_name] !== DummyVariable && schema[column_name] !== TfIdf) {
@@ -159,7 +172,7 @@ export class cumulative_std_scaler {
         })
     }
     waitForPrecision() {
-        return Promise.all<any>(this.performant_columns.map(column => column.waitLastCalc()))
+        return Promise.all<any>(this.precision_columns.map(column => column.waitLastCalc()))
     }
     get precision_matrix() {
         function transposeArray(array:number[][]){
@@ -176,7 +189,7 @@ export class cumulative_std_scaler {
         
             return newArray;
         }
-        const columns = this.performant_columns.map(column => column.as_array)
+        const columns = this.precision_columns.map(column => column.as_array)
         return transposeArray(columns)
     }
     /**
@@ -216,13 +229,13 @@ export class cumulative_std_scaler {
             // Returns the vector of the data point, includes missing data
             const vec_filled = this.unscaled_matrix.setNextIndex(row, normal_entries, this.columns_indexed_names, this.columns_indexed_types);
 
-            let performant_column_index = 0
+            let precision_column_index = 0
             for (const value of vec_filled) {
-                if (!this.performant_columns[performant_column_index]) {
-                    this.performant_columns[performant_column_index] = new SharedArrayScaler()
+                if (!this.precision_columns[precision_column_index]) {
+                    this.precision_columns[precision_column_index] = new SharedArrayScaler()
                 }
-                this.performant_columns[performant_column_index].informData(value, this.unscaled_matrix.numberOfRows - 1, options?.informRecalc)
-                performant_column_index++
+                this.precision_columns[precision_column_index].informData(value, this.unscaled_matrix.numberOfRows - 1, options?.informRecalc)
+                precision_column_index++
             }
 
             // For each new dummy value we will update the props of each new column created
