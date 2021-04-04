@@ -64,20 +64,8 @@ test('[ml] Cumulative Standard Scaler', async () => {
         new NamedVector1D()
     ];
     const css3 = new cumulative_std_scaler(pre_unscaled_matrix2)
-
-    expect(css2.scaled_matrix).toStrictEqual(css3.scaled_matrix);
 });
-test('[ml] Cumulative Standard Scaler With Schema (Dummyless)', async () => {
-    const css = new cumulative_std_scaler([], {
-        db_id: Id,
-        price: Number,
-        size: Number
-    });
 
-    // css.addRow(new NamedVector1D(1000, 10).id('1'), ['price', 'size'])
-    // css.addRow(new NamedVector1D(2000, 12).id('2'), ['price', 'size'])
-    // css.addRow(new NamedVector1D(1500, 21).id('3'), ['price', 'size'])
-});
 test('[ml] Performant Cumulative Standard Scaler', async () => {
     const css = new cumulative_std_scaler([], {
         db_id: Id,
@@ -89,13 +77,31 @@ test('[ml] Performant Cumulative Standard Scaler', async () => {
     css.addRow(new NamedVector1D(1, 1).id('3'), ['price', 'size'])
     css.addRow(new NamedVector1D(1, 1).id('3'), ['price', 'size'])
 
-    //for (let i = 0; i < new Array(2000).fill(0).length; i++) {
-    //    css.addRow(new NamedVector1D(Math.random() * 1000, Math.random() * 1000).id(String(i)), ['price', 'size'])
-    //}
+    for await (const column of css.performant_columns) {
+        expect(typeof column.busy === 'boolean').toBe(true)
+        await column.waitLastCalc()
+        expect(column.busy).toBe(false)
+        expect(column.as_array).toStrictEqual([-1,-1,1,1])
+        expect(column.unscaled_as_array).toStrictEqual([0,0,1,1])
+    }
+});
+
+test('[ml] Performant Cumulative Standard Scaler (Bulky add)', async () => {
+    const css = new cumulative_std_scaler([], {
+        db_id: Id,
+        price: Number,
+        size: Number
+    });
+
+    const batch_size = 5;
+
+    for (let i = 0; i < new Array(batch_size).fill(0).length; i++) {
+        css.addRow(new NamedVector1D(Math.random() * 1000, Math.random() * 1000).id(String(i)), ['price', 'size'], { informRecalc: i === (batch_size - 1) })
+    }
 
     for await (const column of css.performant_columns) {
-        console.log(column.busy)
+        expect(typeof column.busy === 'boolean').toBe(true)
         await column.waitLastCalc()
-        console.log(column.as_array, column.unscaled_as_array, column.busy)
+        expect(column.busy).toBe(false)
     }
 });

@@ -11,7 +11,7 @@ const cbf = new cbf_engine({
     },
 })
 
-test('Content Based Filtering', () => {
+test('Content Based Filtering', async () => {
     cbf.addData({db_id: '123', price: 123, size: 3, type: 'good' });
     cbf.addData({db_id: '2', size: 20, price: 200 , type: 'bad' });
     cbf.addData({size: 33, price: 300, db_id: '3' , type: 'good' });
@@ -26,5 +26,8 @@ test('Content Based Filtering', () => {
     expect(std.unscaled_matrix.map(row => row[1])).toEqual([3,20,33,44444])
     const c_index_type =  std.columns_indexed_names.indexOf('type_good')
     expect(std.unscaled_matrix.map(row => row[c_index_type])).toEqual([1,0,1,0])
-    
+    cbf.addData({size: 1, price: 1, db_id: '4' , type: 'very good' });
+    cbf.addData({size: 12, price: 12, db_id: '4' , type: 'very good' });
+    cbf.addData({size: 32, price: 32, db_id: '4' , type: 'very good' });
+    cbf.addData({size: 34, price: 42, db_id: '4' , type: 'very good' });
 });

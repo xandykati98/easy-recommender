@@ -116,6 +116,7 @@ export class cumulative_std_scaler {
      * The type of each column reflected by the index that it is in
      */
     columns_indexed_types:(TfIdf|Number|DummyVariable)[]
+    full_precision_until_index: number
     performant_columns: SharedArrayScaler[]
 
     constructor(matrix2D: NamedVector1D[] | NamedVector2D, schema?: EngineSchema) {
@@ -123,6 +124,7 @@ export class cumulative_std_scaler {
         this.unscaled_matrix = new NamedVector2D();
         this.columns_indexed_names = []
         this.columns_indexed_types = []
+        this.full_precision_until_index = 10;
         this.performant_columns = []
         if (schema) {
             for (const column_name in schema) {
@@ -137,8 +139,10 @@ export class cumulative_std_scaler {
         this.columns_std = []
         this.columns_sum = []
         this.scaled_matrix = new NamedVector2D();
+        let i = 0;
         for (const row of matrix2D) {
-            this.addRow(new NamedVector1D(...row).id(row._id))
+            this.addRow(new NamedVector1D(...row).id(row._id), undefined, { informRecalc: (matrix2D.length - 1) === i })
+            i++;
         }
         this.rescaleMatrix()
     }
@@ -154,6 +158,27 @@ export class cumulative_std_scaler {
             columns_variance: this.columns_variance,
         })
     }
+    waitForPrecision() {
+        return Promise.all<any>(this.performant_columns.map(column => column.waitLastCalc()))
+    }
+    get precision_matrix() {
+        function transposeArray(array:number[][]){
+            var newArray:number[][] = [];
+            for(var i = 0; i < array[0].length; i++){
+                newArray.push([]);
+            };
+        
+            for(var i = 0; i < array.length; i++){
+                for(var j = 0; j < array[0].length; j++){
+                    newArray[j].push(array[i][j]);
+                };
+            };
+        
+            return newArray;
+        }
+        const columns = this.performant_columns.map(column => column.as_array)
+        return transposeArray(columns)
+    }
     /**
      * 
      * @param row The input vector of unscaled float values
@@ -161,7 +186,7 @@ export class cumulative_std_scaler {
      * @param options 
      * @returns 
      */
-    addRow(row:NamedVector1D, row_indexed_columns?: (string|DummyEntry)[], options?:{ updateColumnProps: boolean }) {
+    addRow(row:NamedVector1D, row_indexed_columns?: (string|DummyEntry)[], options?:{ updateColumnProps?: boolean, informRecalc: boolean }) {
         // If it provides the column names for each value
         if (row_indexed_columns) {
             // We separate values by the column type
@@ -196,7 +221,7 @@ export class cumulative_std_scaler {
                 if (!this.performant_columns[performant_column_index]) {
                     this.performant_columns[performant_column_index] = new SharedArrayScaler()
                 }
-                this.performant_columns[performant_column_index].informData(value, this.unscaled_matrix.numberOfRows - 1)
+                this.performant_columns[performant_column_index].informData(value, this.unscaled_matrix.numberOfRows - 1, options?.informRecalc)
                 performant_column_index++
             }
 
@@ -237,7 +262,7 @@ export class cumulative_std_scaler {
             columns_std: this.columns_std,
         }
         // Just so the initial data insert doesnt have NaN's and Infinities
-        if (this.unscaled_matrix.numberOfRows === 1) {
+        if (this.unscaled_matrix.numberOfRows === 1 || this.full_precision_until_index > this.unscaled_matrix.numberOfRows) {
             this.updateColumnsProps()
             return this.rescaleMatrix()
         } else {

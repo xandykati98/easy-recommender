@@ -97,10 +97,10 @@ class ContentBasedEngine implements EngineSettings {
     /**
      * Adds a single unscaled vector to the std_scaler
      */
-    private addSingleVector(vec:NamedVector1D, vec_indexed_columns:(string|DummyEntry)[]) {
-        return this.std_scaler.addRow(vec, vec_indexed_columns)
+    private addSingleVector(vec:NamedVector1D, vec_indexed_columns:(string|DummyEntry)[], shouldRecalc:boolean = true) {
+        return this.std_scaler.addRow(vec, vec_indexed_columns, { informRecalc: shouldRecalc })
     }
-    private addSingleObject(data:any) {
+    private addSingleObject(data:any, shouldRecalc:boolean = true) {
         let transform_data = { ...data };
         const pipeline = this.viewPipeline()
         for (const check of pipeline) {
@@ -135,7 +135,7 @@ class ContentBasedEngine implements EngineSettings {
                     vec_indexed_columns.push(key)
                 }
             }
-            return this.addSingleVector(vec, vec_indexed_columns)
+            return this.addSingleVector(vec, vec_indexed_columns, shouldRecalc)
         } else {
             // This schema doest use dummy variables nor tf-idf, just add the number vectors to the std_scaler
             const vec = new NamedVector1D().id(data_id)
@@ -146,7 +146,7 @@ class ContentBasedEngine implements EngineSettings {
                 vec_indexed_columns.push(key)
             }
             
-            return this.addSingleVector(vec, vec_indexed_columns)
+            return this.addSingleVector(vec, vec_indexed_columns, shouldRecalc)
         }
     }
     addData(data: InputData | InputData[]) {
@@ -162,14 +162,17 @@ class ContentBasedEngine implements EngineSettings {
                     throw console.error('An Array Vector without and ID was provided to the "addData" method')
                 } else {
                     // It is not a array of vectors. So it can only be an array of objects
-                    for (const item of data) {
-                        this.addSingleObject(item)
+                    for (let index = 0; index < data.length; index++) {
+                        const item = data[index];
+                        // It should not update the "precision_arrays", only on the last item
+                        console.log({ shouldUpdate: (data.length - 1) === index, index, length: data.length, item })
+                        this.addSingleObject(item, (data.length - 1) === index)
                     }
                 }
             }
         } else {
             // It is neither a vector nor a array in any way. It must be a single object. Insert it into the pipeline
-            this.addSingleObject(data)
+            this.addSingleObject(data, true)
         }
     }
 }
