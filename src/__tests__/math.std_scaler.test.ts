@@ -74,7 +74,28 @@ test('[ml] Cumulative Standard Scaler With Schema (Dummyless)', async () => {
         size: Number
     });
 
-    css.addRow(new NamedVector1D(1000, 10).id('1'), ['price', 'size'])
-    css.addRow(new NamedVector1D(2000, 12).id('2'), ['price', 'size'])
-    css.addRow(new NamedVector1D(1500, 21).id('3'), ['price', 'size'])
+    // css.addRow(new NamedVector1D(1000, 10).id('1'), ['price', 'size'])
+    // css.addRow(new NamedVector1D(2000, 12).id('2'), ['price', 'size'])
+    // css.addRow(new NamedVector1D(1500, 21).id('3'), ['price', 'size'])
+});
+test('[ml] Performant Cumulative Standard Scaler', async () => {
+    const css = new cumulative_std_scaler([], {
+        db_id: Id,
+        price: Number,
+        size: Number
+    });
+    css.addRow(new NamedVector1D(0, 0).id('1'), ['price', 'size'])
+    css.addRow(new NamedVector1D(0, 0).id('2'), ['price', 'size'])
+    css.addRow(new NamedVector1D(1, 1).id('3'), ['price', 'size'])
+    css.addRow(new NamedVector1D(1, 1).id('3'), ['price', 'size'])
+
+    //for (let i = 0; i < new Array(2000).fill(0).length; i++) {
+    //    css.addRow(new NamedVector1D(Math.random() * 1000, Math.random() * 1000).id(String(i)), ['price', 'size'])
+    //}
+
+    for await (const column of css.performant_columns) {
+        console.log(column.busy)
+        await column.waitLastCalc()
+        console.log(column.as_array, column.unscaled_as_array, column.busy)
+    }
 });

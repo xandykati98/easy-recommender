@@ -2,8 +2,6 @@ import { cbf_engine } from '../content-based-filtering'
 import { DummyVariable, Id } from '../engine-schema';
 import { cumulative_std_scaler } from '../math/std_scaler';
 
-const numCPUs = require('os').cpus().length;
-console.log(numCPUs)
 const cbf = new cbf_engine({
     schema: {
         db_id: Id,

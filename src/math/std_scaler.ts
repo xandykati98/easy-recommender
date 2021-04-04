@@ -1,6 +1,7 @@
 import { Vector1D, Vector2D } from 'math-types';
 import { DummyEntry, DummyVariable, EngineSchema, Id, TfIdf } from '../engine-schema';
 import sum from './sum';
+import SharedArrayScaler from '../shared-array-scaler'
 
 /**
  * Standardize features by removing the mean and scaling to unit variance
@@ -73,6 +74,8 @@ export class NamedVector2D extends Array<NamedVector1D> implements Vector2D {
         }
 
         this[index] = new NamedVector1D(...vec_filled).id(row._id)
+
+        return vec_filled
     }
     get numberOfRows() {
         return this.length
@@ -113,12 +116,14 @@ export class cumulative_std_scaler {
      * The type of each column reflected by the index that it is in
      */
     columns_indexed_types:(TfIdf|Number|DummyVariable)[]
+    performant_columns: SharedArrayScaler[]
 
     constructor(matrix2D: NamedVector1D[] | NamedVector2D, schema?: EngineSchema) {
         // Deepcopy the initial input vector
         this.unscaled_matrix = new NamedVector2D();
         this.columns_indexed_names = []
         this.columns_indexed_types = []
+        this.performant_columns = []
         if (schema) {
             for (const column_name in schema) {
                 if (schema[column_name] !== Id && schema[column_name] !== DummyVariable && schema[column_name] !== TfIdf) {
@@ -183,7 +188,17 @@ export class cumulative_std_scaler {
             }
 
             // Set the next value of the "unscaled_matrix" with the input row, and provide the "setNextIndex" function with the possible new dummy values
-            this.unscaled_matrix.setNextIndex(row, normal_entries, this.columns_indexed_names, this.columns_indexed_types);
+            // Returns the vector of the data point, includes missing data
+            const vec_filled = this.unscaled_matrix.setNextIndex(row, normal_entries, this.columns_indexed_names, this.columns_indexed_types);
+
+            let performant_column_index = 0
+            for (const value of vec_filled) {
+                if (!this.performant_columns[performant_column_index]) {
+                    this.performant_columns[performant_column_index] = new SharedArrayScaler()
+                }
+                this.performant_columns[performant_column_index].informData(value, this.unscaled_matrix.numberOfRows - 1)
+                performant_column_index++
+            }
 
             // For each new dummy value we will update the props of each new column created
             for (const new_dummy_column of new_dummy_columns) {
