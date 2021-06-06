@@ -1,5 +1,6 @@
 import dot_product from '@math/dot_product';
 import { Vector1D } from 'math-types';
+import { NamedVector1D } from './std_scaler';
 
 /**
  * @description Cosine similarity is a measure of similarity between two non-zero vectors of an inner product space.
@@ -9,9 +10,9 @@ import { Vector1D } from 'math-types';
  * @param {Vector1D} ws 1D Vector, used as "ws" param in the inner "dot_product"
  * @return {number} A number between 1 and -1 where 1 is very similar and -1 is not similar at all
  */
-const cos_similarity = (a: Vector1D, b: Vector1D, ws?: Vector1D) => {
-    const magnitude_a = Math.sqrt(dot_product(a, a, ws));
-    const magnitude_b = Math.sqrt(dot_product(b, b, ws));
+const cos_similarity = (a: NamedVector1D | Vector1D, b: NamedVector1D | Vector1D, ws?: Vector1D) => {
+    const magnitude_a = (a as NamedVector1D)._magnitude || Math.sqrt(dot_product(a, a, ws));
+    const magnitude_b = (b as NamedVector1D)._magnitude || Math.sqrt(dot_product(b, b, ws));
 
     if (magnitude_a && magnitude_b)
         /**

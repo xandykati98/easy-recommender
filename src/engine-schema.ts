@@ -29,6 +29,10 @@ export function RemoveUnnecessaryFields(data: any, schema: EngineSchema):any {
     return copy_data
 }
 
+export interface Wheights {
+    [field_name: string]: number
+}
+
 export function needDummies(schema: EngineSchema):boolean {
     for (const field in schema) {
         if (schema[field] === DummyVariable || schema[field] === TfIdf) return true

@@ -97,6 +97,8 @@ export default class SharedArrayScaler {
             this.worker.postMessage({ length: this.length })
         }
     }
+    // Is this ok? I don't think so, this will probably lag because it's cloning a gigantic shared array.
+    // the best solution is to literally create a array that behaves like a normal array but has a stoppoint at the end of the rows
     get as_array() {
         const fake_array = []
         let i = 0

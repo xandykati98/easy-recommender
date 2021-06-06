@@ -1,6 +1,7 @@
 
-import { Id } from '../engine-schema';
+import { DummyVariable, Id } from '../engine-schema';
 import { std_scaler, cumulative_std_scaler, NamedVector1D, NamedVector2D } from '../math/std_scaler';
+import { zip } from '../util';
 
 const unscaled_matrix = [
     new NamedVector1D(3.0, 0.0),

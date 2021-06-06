@@ -1,11 +1,8 @@
 import { cumulative_std_scaler as CumulativeStdScaler, NamedVector1D } from "@math/std_scaler"
 import { InputData, Vector1D } from "math-types"
-import { DummyEntry, DummyVariable, EngineSchema, Id, needDummies, RemoveUnnecessaryFields, ValidateSchema } from "./engine-schema"
+import { DummyEntry, DummyVariable, EngineSchema, Id, Wheights, RemoveUnnecessaryFields, ValidateSchema } from "./engine-schema"
 import { CallbackArray } from "./util"
 
-interface Wheights {
-    [field_name: string]: number
-}
 interface Fields {
     [field_name: string]: Id | number
 }
@@ -22,7 +19,7 @@ interface EngineSettings {
 
 class ContentBasedEngine implements EngineSettings {
     /**
-     * The schema of the data, only data points that 
+     * The schema of the data
      */
     readonly schema: EngineSchema
     /**
@@ -52,6 +49,9 @@ class ContentBasedEngine implements EngineSettings {
         this.dummy_variables = {}
 
         for (const [ field_name, value ] of Object.entries(this.schema)) {
+            if (field_name.endsWith('___')) {
+                console.warn(`Please don\'t use a "___" (triple underscore) in the end of the field names of the schema (used in ${field_name} with the type ${value.toString()}), this may cause conflict with dummy variables later on. At engine:`, this, this.schema)
+            }
             if (value === Id) {
                 this.id_field = field_name;
             } else {
@@ -76,6 +76,7 @@ class ContentBasedEngine implements EngineSettings {
             ...this.validators,
         ]
         this.std_scaler = new CumulativeStdScaler([], this.schema)
+        this.std_scaler.setWeights(this._wheights)
     }
     get wheights() {
         return this._wheights
@@ -84,6 +85,7 @@ class ContentBasedEngine implements EngineSettings {
         for (const field in update) {
             this._wheights[field] = update[field]
         }
+        this.std_scaler.setWeights(this._wheights)
     }
     viewPipeline() {
         return this.pipeline
@@ -94,6 +96,12 @@ class ContentBasedEngine implements EngineSettings {
     reversePipeline() {
         return this.pipeline.reverse()
     }
+    findSimilarTo(data:any) {
+        let transform_data = this.correctData(data)
+        const { [this.id_field]: data_id, ...pure_data } = transform_data;
+        const { vec, vec_indexed_columns } = this.vectorFromData(data)
+        return this.std_scaler.loopCosineSimilarity(vec, vec_indexed_columns)
+    }
     /**
      * Adds a single unscaled vector to the std_scaler
      */
@@ -101,53 +109,49 @@ class ContentBasedEngine implements EngineSettings {
         return this.std_scaler.addRow(vec, vec_indexed_columns, { informRecalc: shouldRecalc })
     }
     private addSingleObject(data:any, shouldRecalc:boolean = true) {
-        let transform_data = { ...data };
+        const { vec, vec_indexed_columns } = this.vectorFromData(data)
+        return this.addSingleVector(vec, vec_indexed_columns, shouldRecalc)
+    }
+    private correctData(data:any) {
+        let corrected_data = { ...data }
         const pipeline = this.viewPipeline()
         for (const check of pipeline) {
-            const result = check(transform_data)
+            const result = check(corrected_data)
             // Check if it is a validator
             if (typeof result === 'boolean') {
                 if (result === false) throw console.error('One object was unable to pass in a validator', { validator: check, object: data })
             } else {
                 // Else, it is a transformer
-                transform_data = result
+                corrected_data = result
             }
         }
+        return corrected_data
+    }
+    private vectorFromData(data:any) {
+        let transform_data = this.correctData(data)
         /**
          * transform data is almost ready, it was compliant to the schema
          * next we will have to create the dummy variables for the data
          */
         const { [this.id_field]: data_id, ...pure_data } = transform_data;
-        if (needDummies(this.schema)) {
-            // This schema uses binary dummy variables or tf-idf, generate the variables for this data point
-            // and, if necessary, add new dummy variables created by this data point to every other vector as 0 if it is a dummy variable
-            // if it is a tf-idf compute the tf for every data point
 
-            const vec = new NamedVector1D().id(data_id)
-            const vec_indexed_columns:(string|DummyEntry)[] = []
+        // If this schema uses binary dummy variables or tf-idf, generate the variables for this data point
+        // and, if necessary, add new dummy variables created by this data point to every other vector as 0 if it is a dummy variable
+        // if it is a tf-idf compute the tf for every data point
 
-            for (const [ key, value ] of Object.entries<string|number>(pure_data)) {
-                if (this.schema[key] === DummyVariable && typeof value === 'string') {
-                    vec.push(1)
-                    vec_indexed_columns.push({ key, value })
-                } else if (typeof value === 'number') {
-                    vec.push(value)
-                    vec_indexed_columns.push(key)
-                }
-            }
-            return this.addSingleVector(vec, vec_indexed_columns, shouldRecalc)
-        } else {
-            // This schema doest use dummy variables nor tf-idf, just add the number vectors to the std_scaler
-            const vec = new NamedVector1D().id(data_id)
-            const vec_indexed_columns:string[] = []
+        const vec = new NamedVector1D().id(data_id)
+        const vec_indexed_columns:(string|DummyEntry)[] = []
 
-            for (const [ key, value ] of Object.entries<number>(pure_data)) {
+        for (const [ key, value ] of Object.entries<string|number>(pure_data)) {
+            if (this.schema[key] === DummyVariable && typeof value === 'string') {
+                vec.push(1)
+                vec_indexed_columns.push({ key, value })
+            } else if (typeof value === 'number') {
                 vec.push(value)
                 vec_indexed_columns.push(key)
             }
-            
-            return this.addSingleVector(vec, vec_indexed_columns, shouldRecalc)
         }
+        return { vec, vec_indexed_columns }
     }
     addData(data: InputData | InputData[]) {
         if (Array.isArray(data)) {
