@@ -192,9 +192,9 @@ export class cumulative_std_scaler {
                 const dummy_name = column_name.split(this.dummy_divider)[0];
                 const n_of_possible_dummy_values = this.columns_indexed_names.filter(icolumn_name => icolumn_name.startsWith(dummy_name)).length
 
-                this.columns_weights[column_index] = (this.weights[dummy_name] || 1) / n_of_possible_dummy_values;
+                this.columns_weights[column_index] = this.weights[dummy_name] === undefined ? 1 : this.weights[dummy_name] / n_of_possible_dummy_values;
             } else {
-                this.columns_weights[column_index] = this.weights[column_name] || 1;
+                this.columns_weights[column_index] = this.weights[column_name] === undefined ? 1 : this.weights[column_name];
             }
             column_index++
         }
@@ -219,14 +219,14 @@ export class cumulative_std_scaler {
         return Promise.all<any>(this.precision_columns.map(column => column.waitLastCalc()))
     }
     get precision_matrix() {
-        function transposeArray(array:number[][]){
+        function transposeArray(array:number[][]) {
             var newArray:number[][] = [];
-            for(var i = 0; i < array[0].length; i++){
+            for (var i = 0; i < array[0].length; i++) {
                 newArray.push([]);
             };
         
-            for(var i = 0; i < array.length; i++){
-                for(var j = 0; j < array[0].length; j++){
+            for (var i = 0; i < array.length; i++) {
+                for (var j = 0; j < array[0].length; j++) {
                     newArray[j].push(array[i][j]);
                 };
             };
@@ -238,23 +238,27 @@ export class cumulative_std_scaler {
     }
     loopCosineSimilarity(unscaled_row:NamedVector1D, row_indexed_columns: (string|DummyEntry)[]) {
         const { normal_entries } = this.getRowIndexedColumnsForDummies(row_indexed_columns)
-        this.unscaled_matrix.getFilledVector(unscaled_row, normal_entries, this.columns_indexed_names, this.columns_indexed_types)
+        const filled_unscaled_row = this.unscaled_matrix.getFilledVector(unscaled_row, normal_entries, this.columns_indexed_names, this.columns_indexed_types)
+
         const scaled_input_row = []
         let column_index = 0
-        for (const value of unscaled_row) {
+        for (const value of filled_unscaled_row) {
             scaled_input_row.push((value - this.columns_u[column_index]) / this.columns_std[column_index])
             column_index++
         }
+
         const similarities = []
         for (const scaled_row of this.scaled_matrix) {
             similarities.push({
                 id: scaled_row._id,
-                similar_to: unscaled_row._id,
-                similarity: cos_similarity(scaled_row, scaled_input_row)
+                similarity: cos_similarity(scaled_row, scaled_input_row, this.columns_weights)
             })
         }
         return similarities
     }
+    /**
+     * @todo write how it works and what it does 
+     */
     getRowIndexedColumnsForDummies(row_indexed_columns: (string|DummyEntry)[]) {
         // We separate values by the column type
         /**
@@ -283,7 +287,7 @@ export class cumulative_std_scaler {
     }
     /**
      * @param row The input vector of unscaled float values
-     * @param row_indexed_columns The name of the column of each value by index, can contain dummy column names like "mydummy_val1"
+     * @param row_indexed_columns The name of the column of each value by index, can contain dummy column names like "mydummy___val1"
      * @param options 
      * @returns 
      */

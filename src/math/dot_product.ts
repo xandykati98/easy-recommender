@@ -23,8 +23,7 @@ const dot_product = (a: Vector1D, b: Vector1D, ws?: Vector1D) => {
      * b = [8, 2, 8]
      * dot_vector =  [2*8, 7*2, 1*8]
      */
-    const products = a.map((a_val, i) => (ws ? ws[i] : 1) * a_val * b[i]);
-
+    const products = a.map((a_val, i) => (ws !== undefined ? ws[i] : 1) * a_val * b[i]);
     return sum(products)
 }
   

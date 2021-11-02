@@ -53,8 +53,54 @@ test('Content Based Filtering Weights', async () => {
 
     cbf.addData({size: 34, price: 42, db_id: '1' , type: 'very good' });
     cbf.addData({size: 14, price: 500, db_id: '2' , type: 'very bad' });
-
+    cbf.addData({size: 10, price: 600, db_id: '4' , type: 'very bad' });
 
     const std_scaler = (cbf.std_scaler as cumulative_std_scaler)
-    console.log(cbf.wheights, std_scaler.columns_indexed_names, std_scaler.columns_weights)
+    
+    expect(std_scaler.columns_weights).toEqual([ 1, 0.5, 0.3, 0.3, 0.3 ])
 });
+
+test('Content Based Filtering Recommendation (findSimilarTo)', async () => {
+    
+    const cbf = new cbf_engine({
+        schema: {
+            db_id: Id,
+            price: Number,
+            size: Number,
+            type: DummyVariable
+        },
+    })
+
+    cbf.addData({size: 34, price: 42, db_id: '1' , type: 'very good' });
+    cbf.addData({size: 14, price: 500, db_id: '2' , type: 'very bad' });
+    cbf.addData({size: 20, price: 100, db_id: '3' , type: 'very nice' });
+    cbf.addData({size: 10, price: 600, db_id: '4' , type: 'very bad' });
+
+});
+
+test('Content Based Filtering Recommendation (findSimilarTo & Weights)', async () => {
+    
+    const cbf = new cbf_engine({
+        schema: {
+            db_id: Id,
+            price: Number,
+            size: Number,
+            type: DummyVariable
+        },
+    })
+
+    cbf.wheights = {
+        size: 0,
+        type: 0
+    }
+
+    cbf.addData({size: 500, price: 10, db_id: '1' , type: 'very good' });
+    cbf.addData({size: 550, price: 11, db_id: '2' , type: 'very bad' });
+    cbf.addData({size: 600, price: 14, db_id: '3' , type: 'very nice' });
+    cbf.addData({size: 660, price: 20, db_id: '4' , type: 'very bad' });
+    cbf.addData({size: 660, price: 20, db_id: '4' , type: 'very nice' });
+    cbf.addData({size: 660, price: 20, db_id: '4' , type: 'very good' });
+    console.log((cbf.std_scaler as cumulative_std_scaler).columns_weights, (cbf.std_scaler as cumulative_std_scaler).columns_indexed_names)
+    console.log(cbf.findSimilarTo({size: 660, price: 13, db_id: '5', type: 'very bad'}))
+});
+// todo recomendation based on weights

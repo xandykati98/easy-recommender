@@ -97,8 +97,6 @@ class ContentBasedEngine implements EngineSettings {
         return this.pipeline.reverse()
     }
     findSimilarTo(data:any) {
-        let transform_data = this.correctData(data)
-        const { [this.id_field]: data_id, ...pure_data } = transform_data;
         const { vec, vec_indexed_columns } = this.vectorFromData(data)
         return this.std_scaler.loopCosineSimilarity(vec, vec_indexed_columns)
     }
@@ -115,15 +113,22 @@ class ContentBasedEngine implements EngineSettings {
     private correctData(data:any) {
         let corrected_data = { ...data }
         const pipeline = this.viewPipeline()
+        let validator_index = 0;
         for (const check of pipeline) {
             const result = check(corrected_data)
             // Check if it is a validator
             if (typeof result === 'boolean') {
-                if (result === false) throw console.error('One object was unable to pass in a validator', { validator: check, object: data })
+                if (result === false) throw console.error('One object was unable to pass in a validator', { 
+                    validator: check, 
+                    validator_index, 
+                    validator_f_name: check.name || check.toString(), 
+                    object: corrected_data 
+                })
             } else {
                 // Else, it is a transformer
                 corrected_data = result
             }
+            validator_index++
         }
         return corrected_data
     }
