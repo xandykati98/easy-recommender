@@ -89,18 +89,24 @@ test('Content Based Filtering Recommendation (findSimilarTo & Weights)', async (
         },
     })
 
+    /**
+     * Turns out that if all wheights but one are 0 the "cos_similarity" always returns -1 if one of the input vectors are negative.
+     */
+
     cbf.wheights = {
-        size: 0,
-        type: 0
+        size: 0.5,
+        type: 0.5
     }
 
-    cbf.addData({size: 500, price: 10, db_id: '1' , type: 'very good' });
+    cbf.addData({size: 500, price: 1, db_id: '1' , type: 'very good' });
     cbf.addData({size: 550, price: 11, db_id: '2' , type: 'very bad' });
     cbf.addData({size: 600, price: 14, db_id: '3' , type: 'very nice' });
     cbf.addData({size: 660, price: 20, db_id: '4' , type: 'very bad' });
-    cbf.addData({size: 660, price: 20, db_id: '4' , type: 'very nice' });
-    cbf.addData({size: 660, price: 20, db_id: '4' , type: 'very good' });
-    console.log((cbf.std_scaler as cumulative_std_scaler).columns_weights, (cbf.std_scaler as cumulative_std_scaler).columns_indexed_names)
-    console.log(cbf.findSimilarTo({size: 660, price: 13, db_id: '5', type: 'very bad'}))
+    cbf.addData({size: 660, price: 20, db_id: '5' , type: 'very nice' });
+    cbf.addData({size: 660, price: 20, db_id: '5' , type: 'very good' });
+    console.log(
+        (cbf.std_scaler as cumulative_std_scaler).columns_weights, 
+        (cbf.std_scaler as cumulative_std_scaler).columns_indexed_names
+    );
+    console.log(cbf.findSimilarTo({size: 500, price: 13, db_id: '7', type: 'very good'}));
 });
-// todo recomendation based on weights

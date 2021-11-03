@@ -6,6 +6,17 @@ export interface EngineSchema {
     [field_name: string]: Number | Id | DummyVariable | TfIdf
 }
 
+export interface CBFQueryOptions {
+    /**
+     * Maximum number of results within threshold
+     */
+    limit?: number, 
+    /**
+     * A number between 1 and -1, if the similarity between the input and the item that the input is being compared to is lower than the threshold the item will not be returned.
+     */
+    threshold?: number
+}
+
 export type DummyEntry = { 
     /**
      * Dummy column name

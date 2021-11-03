@@ -1,6 +1,6 @@
 import { cumulative_std_scaler as CumulativeStdScaler, NamedVector1D } from "@math/std_scaler"
 import { InputData, Vector1D } from "math-types"
-import { DummyEntry, DummyVariable, EngineSchema, Id, Wheights, RemoveUnnecessaryFields, ValidateSchema } from "./engine-schema"
+import { DummyEntry, DummyVariable, EngineSchema, Id, Wheights, RemoveUnnecessaryFields, ValidateSchema, CBFQueryOptions } from "./engine-schema"
 import { CallbackArray } from "./util"
 
 interface Fields {
@@ -16,6 +16,7 @@ interface EngineSettings {
     logger?: boolean
     loggerMeta?: boolean
 }
+
 
 class ContentBasedEngine implements EngineSettings {
     /**
@@ -81,6 +82,9 @@ class ContentBasedEngine implements EngineSettings {
     get wheights() {
         return this._wheights
     }
+    /**
+     * @description Do not set all wheights but one to 0. The whole point of the similarity calculation is to measure the whole vector. If you only have only one numeric element in your vector there are better algorithms to do the job.
+     */
     set wheights(update:Wheights) {
         for (const field in update) {
             this._wheights[field] = update[field]
@@ -96,9 +100,9 @@ class ContentBasedEngine implements EngineSettings {
     reversePipeline() {
         return this.pipeline.reverse()
     }
-    findSimilarTo(data:any) {
+    findSimilarTo(data:any, options?:CBFQueryOptions) {
         const { vec, vec_indexed_columns } = this.vectorFromData(data)
-        return this.std_scaler.loopCosineSimilarity(vec, vec_indexed_columns)
+        return this.std_scaler.loopCosineSimilarity(vec, vec_indexed_columns, options)
     }
     /**
      * Adds a single unscaled vector to the std_scaler

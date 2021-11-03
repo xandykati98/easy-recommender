@@ -1,5 +1,5 @@
 import { Vector1D, Vector2D } from 'math-types';
-import { DummyEntry, DummyVariable, EngineSchema, Id, TfIdf, Wheights } from '../engine-schema';
+import { CBFQueryOptions, DummyEntry, DummyVariable, EngineSchema, Id, TfIdf, Wheights } from '../engine-schema';
 import sum from './sum';
 import SharedArrayScaler from '../shared-array-scaler'
 import cos_similarity from './cos_similarity';
@@ -48,9 +48,6 @@ export class NamedVector1D extends Array<number> implements Vector1D {
     id(newId:string) {
         this._id = newId
         return this
-    }
-    setMagnitude(weights:number[]) {
-        this._magnitude = Math.sqrt(dot_product(this, this, weights));
     }
 }
 
@@ -236,7 +233,7 @@ export class cumulative_std_scaler {
         const columns = this.precision_columns.map(column => column.as_array)
         return transposeArray(columns)
     }
-    loopCosineSimilarity(unscaled_row:NamedVector1D, row_indexed_columns: (string|DummyEntry)[]) {
+    loopCosineSimilarity(unscaled_row:NamedVector1D, row_indexed_columns: (string|DummyEntry)[], options?:CBFQueryOptions) {
         const { normal_entries } = this.getRowIndexedColumnsForDummies(row_indexed_columns)
         const filled_unscaled_row = this.unscaled_matrix.getFilledVector(unscaled_row, normal_entries, this.columns_indexed_names, this.columns_indexed_types)
 
@@ -249,10 +246,23 @@ export class cumulative_std_scaler {
 
         const similarities = []
         for (const scaled_row of this.scaled_matrix) {
-            similarities.push({
+            const similarity = cos_similarity(scaled_row, scaled_input_row, this.columns_weights)
+            
+            if (options?.threshold) {
+                if (similarity > options.threshold) {
+                    similarities.push({
+                        id: scaled_row._id,
+                        similarity: similarity
+                    })
+                }
+            } else similarities.push({
                 id: scaled_row._id,
-                similarity: cos_similarity(scaled_row, scaled_input_row, this.columns_weights)
-            })
+                similarity: similarity
+            });
+
+            if (similarities.length === options?.limit) {
+                return similarities
+            }
         }
         return similarities
     }
